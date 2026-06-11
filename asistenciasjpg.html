@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Asistencias</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
+.hidden{display:none!important}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
+.login-card{background:#fff;border:1px solid #e0e0d8;border-radius:14px;padding:2.5rem;width:100%;max-width:380px;box-shadow:0 2px 16px rgba(0,0,0,0.07)}
+.login-logo{font-size:28px;margin-bottom:0.25rem}
+.login-title{font-size:22px;font-weight:600;margin-bottom:0.25rem}
+.login-sub{font-size:14px;color:#666;margin-bottom:2rem}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:13px;color:#555;margin-bottom:5px;font-weight:500}
+.field input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;color:#1a1a1a;outline:none;transition:border-color 0.15s}
+.field input:focus{border-color:#378ADD}
+.btn-primary{width:100%;padding:11px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity 0.15s}
+.btn-primary:hover{opacity:0.85}
+.err{color:#c0392b;font-size:13px;margin-top:0.75rem;text-align:center}
+.app{padding:1.25rem;max-width:1100px;margin:0 auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px}
+.topbar-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.app-title{font-size:20px;font-weight:700;letter-spacing:-0.3px}
+.app-title span{color:#378ADD}
+select{padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;cursor:pointer;outline:none}
+.btn-sm{padding:7px 14px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;cursor:pointer;transition:background 0.12s;display:inline-flex;align-items:center;gap:5px}
+.btn-sm:hover{background:#f0f0ec}
+.btn-danger{border-color:#f5c6c6;color:#c0392b}
+.btn-danger:hover{background:#fff5f5}
+.nav-row{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem}
+.month-label{font-size:16px;font-weight:600;min-width:180px;text-align:center}
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-bottom:1.75rem}
+.emp-card{background:#fff;border:1px solid #e8e8e0;border-radius:12px;padding:1.1rem;cursor:pointer;transition:all 0.15s}
+.emp-card:hover{border-color:#378ADD;box-shadow:0 2px 10px rgba(55,138,221,0.12)}
+.emp-name{font-size:15px;font-weight:600;margin-bottom:2px}
+.emp-role{font-size:12px;color:#888;margin-bottom:12px}
+.emp-stats{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+.stat-pill{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600}
+.pill-ok{background:#eaf3de;color:#3b6d11}
+.pill-late{background:#faeeda;color:#854f0b}
+.pill-abs{background:#fcebeb;color:#a32d2d}
+.pill-vac{background:#e6f1fb;color:#185fa5}
+.vac-bar{font-size:11px;color:#888}
+.vac-track{height:5px;background:#efefeb;border-radius:3px;margin-top:4px;overflow:hidden}
+.vac-fill{height:100%;background:#378ADD;border-radius:3px;transition:width 0.3s}
+.cal-section{background:#fff;border:1px solid #e8e8e0;border-radius:12px;padding:1.25rem;margin-bottom:1.25rem}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal-dow{font-size:11px;color:#999;text-align:center;padding:5px 0;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.cal-day{border-radius:8px;padding:6px 5px;min-height:68px;border:1px solid #efefeb;cursor:pointer;position:relative;transition:all 0.12s}
+.cal-day:hover{border-color:#aaa}
+.cal-day.empty{border-color:transparent;background:transparent;cursor:default}
+.cal-day.nowork{background:#fafaf8;cursor:default;opacity:0.45}
+.cal-day.present{background:#eaf3de;border-color:#b8dba0}
+.cal-day.absent{background:#fcebeb;border-color:#f0b8b8}
+.cal-day.vacation{background:#e6f1fb;border-color:#b5d4f4}
+.cal-day.late{background:#faeeda;border-color:#f5c88a}
+.day-num{font-size:12px;font-weight:600;color:#888}
+.day-badge{font-size:9px;font-weight:700;margin-top:3px;text-transform:uppercase;letter-spacing:0.03em}
+.day-time{font-size:9px;color:#aaa;margin-top:2px;line-height:1.3}
+.summary-row{display:flex;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap}
+.sum-card{background:#fafaf8;border-radius:8px;padding:0.8rem 1rem;flex:1;min-width:90px}
+.sum-label{font-size:10px;color:#999;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600}
+.sum-val{font-size:20px;font-weight:700}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.modal{background:#fff;border-radius:14px;padding:1.75rem;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,0.15)}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:3px}
+.modal-sub{font-size:13px;color:#888;margin-bottom:1.5rem;line-height:1.5}
+.modal-field{margin-bottom:0.9rem}
+.modal-field label{display:block;font-size:12px;color:#666;margin-bottom:5px;font-weight:600}
+.modal-field input,.modal-field select{width:100%;padding:9px 11px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;outline:none}
+.modal-field input:focus,.modal-field select:focus{border-color:#378ADD}
+.modal-actions{display:flex;gap:8px;margin-top:1.5rem;justify-content:flex-end}
+.btn-cancel{padding:8px 18px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;cursor:pointer}
+.btn-save{padding:8px 18px;font-size:13px;border:none;border-radius:8px;background:#1a1a1a;color:#fff;cursor:pointer;font-weight:600}
+.btn-save:hover{opacity:0.85}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px}
+.vac-badge{font-size:12px;color:#185fa5;background:#e6f1fb;padding:5px 12px;border-radius:20px;font-weight:600}
+@media(max-width:600px){
+  .app{padding:0.75rem}
+  .summary-row{gap:6px}
+  .sum-card{min-width:70px;padding:0.6rem 0.75rem}
+  .sum-val{font-size:16px}
+  .cal-day{min-height:52px;padding:4px 3px}
+}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">📋</div>
+      <p class="login-title">Control de Asistencias</p>
+      <p class="login-sub">Ingresá con tu usuario administrador</p>
+      <div class="field"><label>Usuario</label><input type="text" id="usr" placeholder="adminluca" autocomplete="username" /></div>
+      <div class="field"><label>Contraseña</label><input type="password" id="pwd" placeholder="••••••••" autocomplete="current-password" /></div>
+      <button class="btn-primary" onclick="doLogin()">Ingresar</button>
+      <p class="err hidden" id="login-err">Usuario o contraseña incorrectos</p>
+    </div>
+  </div>
+</div>
+
+<div id="app-screen" class="hidden">
+  <div class="app">
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="app-title">Control de <span>Asistencias</span></span>
+        <select id="filter-emp" onchange="render()">
+          <option value="all">Todos los empleados</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-sm" onclick="exportPDF()">⬇ Exportar PDF</button>
+        <button class="btn-sm btn-danger" onclick="doLogout()">Salir</button>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn-sm" onclick="changeMonth(-1)">&#8249;</button>
+      <span class="month-label" id="month-label"></span>
+      <button class="btn-sm" onclick="changeMonth(1)">&#8250;</button>
+    </div>
+
+    <div id="cards-area"></div>
+  </div>
+</div>
+
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal">
+    <p class="modal-title" id="modal-title">Registrar asistencia</p>
+    <p class="modal-sub" id="modal-sub"></p>
+    <div class="modal-field">
+      <label>Estado</label>
+      <select id="m-status" onchange="toggleTimeFields()">
+        <option value="present">✅ Presente</option>
+        <option value="late">🕐 Llegó tarde</option>
+        <option value="absent">❌ Ausente</option>
+        <option value="vacation">🏖 Vacaciones</option>
+      </select>
+    </div>
+    <div id="time-fields">
+      <div class="modal-field"><label>Hora de entrada real</label><input type="time" id="m-in" /></div>
+      <div class="modal-field"><label>Hora de salida real</label><input type="time" id="m-out" /></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModalDirect()">Cancelar</button>
+      <button class="btn-save" onclick="saveRecord()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const EMPLOYEES = [
+  {id:'trinidad',name:'Trinidad Hernandez',role:'Vendedora',schedule:{1:[{s:'10:00',e:'15:30'}],4:[{s:'12:45',e:'16:00'}],5:[{s:'12:45',e:'17:30'}]}},
+  {id:'franco',name:'Franco Pichinenda',role:'Vendedor',schedule:{2:[{s:'09:15',e:'15:30'}],4:[{s:'09:15',e:'14:30'}],5:[{s:'09:15',e:'15:30'}]}},
+  {id:'lola',name:'Lola Corbacho',role:'Vendedora',schedule:{1:[{s:'09:00',e:'14:00'}],5:[{s:'09:00',e:'14:00'}]}},
+  {id:'maia',name:'Maia Bessolo',role:'Administración',schedule:{1:[{s:'09:00',e:'16:00'}],2:[{s:'09:00',e:'16:00'}],3:[{s:'09:00',e:'16:00'}],4:[{s:'09:00',e:'16:00'}],5:[{s:'09:00',e:'16:00'}]}},
+  {id:'luisina',name:'Luisina Romero',role:'Administración',schedule:{1:[{s:'09:30',e:'15:30'}],2:[{s:'09:30',e:'15:30'}],3:[{s:'09:30',e:'15:30'}],4:[{s:'09:30',e:'15:30'}],5:[{s:'09:30',e:'15:30'}]}},
+  {id:'augusto',name:'Augusto Festa',role:'Administración',schedule:{1:[{s:'14:30',e:'18:00'}],3:[{s:'14:30',e:'18:00'}],5:[{s:'14:30',e:'18:00'}]}}
+];
+
+const VAC_TOTAL = 20;
+let curYear = new Date().getFullYear();
+let curMonth = new Date().getMonth();
+let records = {};
+let vacUsed = {};
+let modalCtx = null;
+
+function storageKey(){return 'att_'+curYear+'_'+curMonth;}
+function vacKey(id){return 'vac_'+id+'_'+curYear;}
+
+function loadData(){
+  try{
+    const r = localStorage.getItem(storageKey());
+    records = r ? JSON.parse(r) : {};
+  }catch(e){records={};}
+  for(const emp of EMPLOYEES){
+    try{
+      const v = localStorage.getItem(vacKey(emp.id));
+      vacUsed[emp.id] = v ? parseInt(v) : 0;
+    }catch(e){vacUsed[emp.id]=0;}
+  }
+}
+
+function saveData(){
+  localStorage.setItem(storageKey(), JSON.stringify(records));
+}
+
+function saveVac(id){
+  localStorage.setItem(vacKey(id), String(vacUsed[id]||0));
+}
+
+function doLogin(){
+  const u=document.getElementById('usr').value.trim();
+  const p=document.getElementById('pwd').value.trim();
+  if(u==='adminluca'&&p==='jpgargentina'){
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app-screen').classList.remove('hidden');
+    init();
+  } else {
+    document.getElementById('login-err').classList.remove('hidden');
+  }
+}
+
+function doLogout(){
+  document.getElementById('app-screen').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('usr').value='';
+  document.getElementById('pwd').value='';
+  document.getElementById('login-err').classList.add('hidden');
+}
+
+function init(){
+  const sel=document.getElementById('filter-emp');
+  sel.innerHTML='<option value="all">Todos los empleados</option>';
+  for(const e of EMPLOYEES){
+    const o=document.createElement('option');
+    o.value=e.id;o.textContent=e.name;
+    sel.appendChild(o);
+  }
+  loadData();
+  updateMonthLabel();
+  render();
+}
+
+function updateMonthLabel(){
+  const d=new Date(curYear,curMonth,1);
+  document.getElementById('month-label').textContent=
+    d.toLocaleDateString('es-AR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase());
+}
+
+function changeMonth(d){
+  curMonth+=d;
+  if(curMonth<0){curMonth=11;curYear--;}
+  if(curMonth>11){curMonth=0;curYear++;}
+  loadData();
+  updateMonthLabel();
+  render();
+}
+
+function getDaysInMonth(y,m){return new Date(y,m+1,0).getDate();}
+function getFirstDow(y,m){let d=new Date(y,m,1).getDay();return d===0?6:d-1;}
+function toMin(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
+function minToStr(m){
+  const neg=m<0;const abs=Math.abs(m);
+  const h=Math.floor(abs/60);const mn=abs%60;
+  return (neg?'-':'')+(String(h).padStart(2,'0'))+':'+(String(mn).padStart(2,'0'))+'hs';
+}
+
+function getRecord(empId,day){return records[empId+'_'+day]||null;}
+
+function empStats(emp){
+  const days=getDaysInMonth(curYear,curMonth);
+  let present=0,late=0,absent=0,vac=0,totalExpMin=0,totalRealMin=0,lateMins=0;
+  for(let d=1;d<=days;d++){
+    const dow=new Date(curYear,curMonth,d).getDay();
+    const jsDow=dow===0?6:dow-1;
+    if(!emp.schedule[jsDow]) continue;
+    const sch=emp.schedule[jsDow][0];
+    const rec=getRecord(emp.id,d);
+    totalExpMin+=toMin(sch.e)-toMin(sch.s);
+    if(!rec) continue;
+    if(rec.status==='present'||rec.status==='late'){
+      present++;
+      if(rec.inTime&&rec.outTime){
+        totalRealMin+=toMin(rec.outTime)-toMin(rec.inTime);
+        const diff=toMin(rec.inTime)-toMin(sch.s);
+        if(diff>0){late++;lateMins+=diff;}
+      }
+    } else if(rec.status==='absent'){absent++;}
+    else if(rec.status==='vacation'){vac++;}
+  }
+  return{present,late,absent,vac,totalExpMin,totalRealMin,lateMins};
+}
+
+function render(){
+  const filter=document.getElementById('filter-emp').value;
+  const area=document.getElementById('cards-area');
+  area.innerHTML='';
+  const emps=filter==='all'?EMPLOYEES:EMPLOYEES.filter(e=>e.id===filter);
+
+  if(filter==='all'){
+    const vendedores=EMPLOYEES.filter(e=>e.role!=='Administración');
+    const admins=EMPLOYEES.filter(e=>e.role==='Administración');
+
+    [['Vendedores',vendedores],['Administración',admins]].forEach(([title,group])=>{
+      const label=document.createElement('p');
+      label.style.cssText='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#aaa;margin-bottom:10px';
+      label.textContent=title;
+      area.appendChild(label);
+      const grid=document.createElement('div');
+      grid.className='emp-grid';
+      for(const emp of group){
+        const st=empStats(emp);
+        const vacLeft=VAC_TOTAL-(vacUsed[emp.id]||0);
+        const pct=((vacUsed[emp.id]||0)/VAC_TOTAL)*100;
+        const card=document.createElement('div');
+        card.className='emp-card';
+        card.onclick=()=>{document.getElementById('filter-emp').value=emp.id;render();};
+        card.innerHTML=`<div class="emp-name">${emp.name}</div>
+          <div class="emp-role">${emp.role}</div>
+          <div class="emp-stats">
+            <span class="stat-pill pill-ok">✓ ${st.present} presentes</span>
+            ${st.late>0?`<span class="stat-pill pill-late">⏱ ${st.late} tard.</span>`:''}
+            ${st.absent>0?`<span class="stat-pill pill-abs">✗ ${st.absent} ausencias</span>`:''}
+            ${st.vac>0?`<span class="stat-pill pill-vac">🏖 ${st.vac} vac.</span>`:''}
+          </div>
+          <div class="vac-bar">Vacaciones: ${vacLeft} días restantes de ${VAC_TOTAL}
+            <div class="vac-track"><div class="vac-fill" style="width:${Math.min(pct,100)}%"></div></div>
+          </div>`;
+        grid.appendChild(card);
+      }
+      area.appendChild(grid);
+    });
+    return;
+  }
+
+  for(const emp of emps){
+    const st=empStats(emp);
+    const vacLeft=VAC_TOTAL-(vacUsed[emp.id]||0);
+    const pct=((vacUsed[emp.id]||0)/VAC_TOTAL)*100;
+    const sec=document.createElement('div');
+    sec.className='cal-section';
+
+    sec.innerHTML=`<div class="section-header">
+      <div><div style="font-size:16px;font-weight:700">${emp.name}</div><div style="font-size:12px;color:#888">${emp.role}</div></div>
+      <div class="vac-badge">🏖 ${vacLeft}/${VAC_TOTAL} días de vacaciones disponibles</div>
+    </div>
+    <div class="summary-row">
+      <div class="sum-card"><div class="sum-label">Presentes</div><div class="sum-val" style="color:#3b6d11">${st.present}</div></div>
+      <div class="sum-card"><div class="sum-label">Tardanzas</div><div class="sum-val" style="color:#854f0b">${st.late}<span style="font-size:11px;font-weight:400;margin-left:3px">${st.lateMins>0?minToStr(st.lateMins):''}</span></div></div>
+      <div class="sum-card"><div class="sum-label">Ausencias</div><div class="sum-val" style="color:#a32d2d">${st.absent}</div></div>
+      <div class="sum-card"><div class="sum-label">Vacaciones</div><div class="sum-val" style="color:#185fa5">${st.vac}</div></div>
+      <div class="sum-card"><div class="sum-label">Hs esperadas</div><div class="sum-val">${minToStr(st.totalExpMin)}</div></div>
+      <div class="sum-card"><div class="sum-label">Hs reales</div><div class="sum-val">${minToStr(st.totalRealMin)}</div></div>
+    </div>`;
+
+    const calGrid=document.createElement('div');
+    calGrid.className='cal-grid';
+    ['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'].forEach(d=>{
+      const h=document.createElement('div');h.className='cal-dow';h.textContent=d;calGrid.appendChild(h);
+    });
+
+    const firstDow=getFirstDow(curYear,curMonth);
+    const totalDays=getDaysInMonth(curYear,curMonth);
+    for(let i=0;i<firstDow;i++){const e=document.createElement('div');e.className='cal-day empty';calGrid.appendChild(e);}
+
+    for(let d=1;d<=totalDays;d++){
+      const dow=new Date(curYear,curMonth,d).getDay();
+      const jsDow=dow===0?6:dow-1;
+      const hasWork=!!emp.schedule[jsDow];
+      const rec=getRecord(emp.id,d);
+      const cell=document.createElement('div');
+      cell.className='cal-day'+(hasWork?'':' nowork');
+      if(rec){cell.classList.add(rec.status==='present'?'present':rec.status==='late'?'late':rec.status==='absent'?'absent':'vacation');}
+
+      const statusMap={present:'<span class="day-badge" style="color:#3b6d11">Presente</span>',
+        late:'<span class="day-badge" style="color:#854f0b">Tarde</span>',
+        absent:'<span class="day-badge" style="color:#a32d2d">Ausente</span>',
+        vacation:'<span class="day-badge" style="color:#185fa5">Vacaciones</span>'};
+      const timeLabel=rec&&rec.inTime&&rec.outTime?`<div class="day-time">${rec.inTime}<br>${rec.outTime}</div>`:'';
+      cell.innerHTML=`<div class="day-num">${d}</div>${rec?statusMap[rec.status]:''}${timeLabel}`;
+
+      if(hasWork){
+        cell.title='Click para registrar';
+        cell.onclick=(()=>{const dd=d;const ee=emp;return()=>openModal(ee,dd);})(d,emp);
+      }
+      calGrid.appendChild(cell);
+    }
+    sec.appendChild(calGrid);
+    area.appendChild(sec);
+  }
+}
+
+function openModal(emp,day){
+  modalCtx={emp,day};
+  const dow=new Date(curYear,curMonth,day).getDay();
+  const jsDow=dow===0?6:dow-1;
+  const sch=emp.schedule[jsDow][0];
+  document.getElementById('modal-title').textContent='Registrar asistencia';
+  document.getElementById('modal-sub').textContent=`${emp.name} — ${String(day).padStart(2,'0')}/${String(curMonth+1).padStart(2,'0')}/${curYear}  ·  Horario esperado: ${sch.s} – ${sch.e}`;
+  const rec=getRecord(emp.id,day);
+  document.getElementById('m-status').value=rec?rec.status:'present';
+  document.getElementById('m-in').value=rec&&rec.inTime?rec.inTime:sch.s;
+  document.getElementById('m-out').value=rec&&rec.outTime?rec.outTime:sch.e;
+  toggleTimeFields();
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function toggleTimeFields(){
+  const s=document.getElementById('m-status').value;
+  document.getElementById('time-fields').style.display=(s==='present'||s==='late')?'block':'none';
+}
+
+function closeModalDirect(){document.getElementById('modal-overlay').classList.add('hidden');modalCtx=null;}
+document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)closeModalDirect();});
+
+function saveRecord(){
+  const{emp,day}=modalCtx;
+  const status=document.getElementById('m-status').value;
+  const inTime=document.getElementById('m-in').value;
+  const outTime=document.getElementById('m-out').value;
+  const k=emp.id+'_'+day;
+  const prevRec=records[k];
+  const wasVac=prevRec&&prevRec.status==='vacation';
+  const wasAbs=prevRec&&prevRec.status==='absent';
+
+  if(status==='vacation'){
+    if(!wasVac) vacUsed[emp.id]=(vacUsed[emp.id]||0)+1;
+  } else if(status==='absent'){
+    if(wasVac) vacUsed[emp.id]=Math.max(0,(vacUsed[emp.id]||0)-1);
+  } else {
+    if(wasVac) vacUsed[emp.id]=Math.max(0,(vacUsed[emp.id]||0)-1);
+  }
+
+  records[k]={
+    status,
+    inTime:(status==='present'||status==='late')?inTime:'',
+    outTime:(status==='present'||status==='late')?outTime:''
+  };
+  saveData();
+  saveVac(emp.id);
+  closeModalDirect();
+  render();
+}
+
+function exportPDF(){
+  const filter=document.getElementById('filter-emp').value;
+  const emps=filter==='all'?EMPLOYEES:EMPLOYEES.filter(e=>e.id===filter);
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const monthName=new Date(curYear,curMonth,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+
+  emps.forEach((emp,idx)=>{
+    if(idx>0) doc.addPage();
+    const st=empStats(emp);
+    const vacLeft=VAC_TOTAL-(vacUsed[emp.id]||0);
+    let y=18;
+
+    doc.setFontSize(9);doc.setTextColor(150);
+    doc.text('CONTROL DE ASISTENCIAS',14,y);
+    y+=6;
+    doc.setFontSize(18);doc.setTextColor(0);doc.setFont(undefined,'bold');
+    doc.text(emp.name,14,y);
+    y+=7;
+    doc.setFontSize(11);doc.setFont(undefined,'normal');doc.setTextColor(100);
+    doc.text(emp.role+' · '+monthName.charAt(0).toUpperCase()+monthName.slice(1),14,y);
+    y+=10;
+
+    // Stats boxes
+    const boxes=[
+      {label:'Presentes',val:String(st.present),bg:[234,243,222],tc:[58,109,17]},
+      {label:'Tardanzas',val:st.late+(st.lateMins>0?' ('+minToStr(st.lateMins)+')':''),bg:[250,238,218],tc:[133,79,11]},
+      {label:'Ausencias',val:String(st.absent),bg:[252,235,235],tc:[163,45,45]},
+      {label:'Vacaciones',val:st.vac+' usadas · '+vacLeft+' disp.',bg:[230,241,251],tc:[24,95,165]},
+    ];
+    const bw=43;
+    boxes.forEach((b,i)=>{
+      const x=14+i*(bw+3);
+      doc.setFillColor(...b.bg);doc.roundedRect(x,y,bw,14,2,2,'F');
+      doc.setFontSize(8);doc.setTextColor(100);doc.setFont(undefined,'normal');
+      doc.text(b.label,x+3,y+5);
+      doc.setFontSize(10);doc.setTextColor(...b.tc);doc.setFont(undefined,'bold');
+      doc.text(b.val,x+3,y+11);
+    });
+    y+=20;
+
+    doc.setFontSize(10);doc.setFont(undefined,'normal');doc.setTextColor(0);
+    doc.text('Horas esperadas: '+minToStr(st.totalExpMin),14,y);
+    doc.text('Horas reales: '+minToStr(st.totalRealMin),75,y);
+    const diff=st.totalRealMin-st.totalExpMin;
+    doc.setTextColor(diff>=0?58:163,diff>=0?109:45,diff>=0?17:45);
+    doc.text('Diferencia: '+(diff>=0?'+':'')+minToStr(diff),140,y);
+    doc.setTextColor(0);
+    y+=12;
+
+    // Table header
+    doc.setFillColor(245,245,242);doc.rect(14,y,182,8,'F');
+    doc.setFontSize(9);doc.setFont(undefined,'bold');doc.setTextColor(80);
+    const cols=[14,42,80,110,140,168];
+    const heads=['Fecha','Horario esperado','Entrada','Salida','Estado','Diferencia'];
+    heads.forEach((h,i)=>doc.text(h,cols[i]+2,y+5.5));
+    y+=10;
+
+    doc.setFont(undefined,'normal');doc.setTextColor(0);
+    const totalDays=getDaysInMonth(curYear,curMonth);
+    const dows=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+    for(let d=1;d<=totalDays;d++){
+      const jsDate=new Date(curYear,curMonth,d);
+      const dow=jsDate.getDay();
+      const jsDow=dow===0?6:dow-1;
+      if(!emp.schedule[jsDow]) continue;
+      const sch=emp.schedule[jsDow][0];
+      const rec=getRecord(emp.id,d);
+      const dateStr=dows[dow]+' '+String(d).padStart(2,'0')+'/'+(String(curMonth+1).padStart(2,'0'));
+      const statusMap={present:'Presente',late:'Tarde',absent:'Ausente',vacation:'Vacaciones'};
+      const colorMap={present:[58,109,17],late:[133,79,11],absent:[163,45,45],vacation:[24,95,165]};
+      let diffStr='-',inStr='-',outStr='-';
+      if(rec&&(rec.status==='present'||rec.status==='late')&&rec.inTime&&rec.outTime){
+        inStr=rec.inTime;outStr=rec.outTime;
+        const dif=(toMin(rec.outTime)-toMin(rec.inTime))-(toMin(sch.e)-toMin(sch.s));
+        diffStr=(dif>=0?'+':'')+minToStr(dif);
+      }
+      if(y>272){doc.addPage();y=18;}
+      doc.setFontSize(9);doc.setTextColor(0);
+      doc.text(dateStr,cols[0]+2,y);
+      doc.text(sch.s+' – '+sch.e,cols[1]+2,y);
+      doc.text(inStr,cols[2]+2,y);
+      doc.text(outStr,cols[3]+2,y);
+      if(rec){const c=colorMap[rec.status];doc.setTextColor(...c);doc.text(statusMap[rec.status],cols[4]+2,y);doc.setTextColor(0);}
+      else doc.text('—',cols[4]+2,y);
+      doc.text(diffStr,cols[5]+2,y);
+      y+=5;
+      doc.setDrawColor(230);doc.line(14,y,196,y);
+      y+=1;
+    }
+
+    // Absence summary
+    const absDays=[];
+    for(let d=1;d<=totalDays;d++){
+      const rec=getRecord(emp.id,d);
+      if(rec&&(rec.status==='absent'||rec.status==='vacation')){
+        const dow=new Date(curYear,curMonth,d).getDay();
+        absDays.push({d,status:rec.status,dow});
+      }
+    }
+    if(absDays.length>0){
+      if(y>260){doc.addPage();y=18;}
+      y+=6;
+      doc.setFontSize(10);doc.setFont(undefined,'bold');doc.setTextColor(0);
+      doc.text('Detalle de ausencias y vacaciones',14,y);y+=7;
+      doc.setFont(undefined,'normal');doc.setFontSize(9);
+      for(const a of absDays){
+        const label=a.status==='absent'?'Ausencia':'Vacaciones';
+        const c=a.status==='absent'?[163,45,45]:[24,95,165];
+        doc.setTextColor(...c);
+        doc.text('· '+dows[a.dow===6?0:a.dow+1]+' '+String(a.d).padStart(2,'0')+'/'+(String(curMonth+1).padStart(2,'0'))+'/'+curYear+': '+label,16,y);
+        doc.setTextColor(0);y+=5;
+        if(y>278){doc.addPage();y=18;}
+      }
+    }
+  });
+
+  const fn=filter==='all'?`asistencias_${String(curMonth+1).padStart(2,'0')}_${curYear}.pdf`:`${filter}_${String(curMonth+1).padStart(2,'0')}_${curYear}.pdf`;
+  doc.save(fn);
+}
+
+document.getElementById('usr').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('pwd').focus();});
+document.getElementById('pwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+</script>
+</body>
+</html>
