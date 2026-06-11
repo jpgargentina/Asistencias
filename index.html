@@ -43,6 +43,7 @@ select{padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;b
 .pill-late{background:#faeeda;color:#854f0b}
 .pill-abs{background:#fcebeb;color:#a32d2d}
 .pill-vac{background:#e6f1fb;color:#185fa5}
+.pill-rec{background:#f0e6fb;color:#6b21a8}
 .vac-bar{font-size:11px;color:#888}
 .vac-track{height:5px;background:#efefeb;border-radius:3px;margin-top:4px;overflow:hidden}
 .vac-fill{height:100%;background:#378ADD;border-radius:3px;transition:width 0.3s}
@@ -52,11 +53,13 @@ select{padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;b
 .cal-day{border-radius:8px;padding:6px 5px;min-height:68px;border:1px solid #efefeb;cursor:pointer;position:relative;transition:all 0.12s}
 .cal-day:hover{border-color:#aaa}
 .cal-day.empty{border-color:transparent;background:transparent;cursor:default}
-.cal-day.nowork{background:#fafaf8;cursor:default;opacity:0.45}
+.cal-day.nowork{background:#fafaf8;border:1px dashed #e0e0d8;cursor:pointer}
+.cal-day.nowork:hover{border-color:#aaa}
 .cal-day.present{background:#eaf3de;border-color:#b8dba0}
 .cal-day.absent{background:#fcebeb;border-color:#f0b8b8}
 .cal-day.vacation{background:#e6f1fb;border-color:#b5d4f4}
 .cal-day.late{background:#faeeda;border-color:#f5c88a}
+.cal-day.recovery{background:#f0e6fb;border-color:#d8b4fe}
 .day-num{font-size:12px;font-weight:600;color:#888}
 .day-badge{font-size:9px;font-weight:700;margin-top:3px;text-transform:uppercase;letter-spacing:0.03em}
 .day-time{font-size:9px;color:#aaa;margin-top:2px;line-height:1.3}
@@ -78,6 +81,7 @@ select{padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;b
 .btn-save:hover{opacity:0.85}
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px}
 .vac-badge{font-size:12px;color:#185fa5;background:#e6f1fb;padding:5px 12px;border-radius:20px;font-weight:600}
+.nowork-hint{font-size:9px;color:#bbb;margin-top:2px}
 @media(max-width:600px){
   .app{padding:0.75rem}
   .summary-row{gap:6px}
@@ -139,6 +143,7 @@ select{padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;b
         <option value="late">🕐 Llegó tarde</option>
         <option value="absent">❌ Ausente</option>
         <option value="vacation">🏖 Vacaciones</option>
+        <option value="recovery">🔄 Recupero</option>
       </select>
     </div>
     <div id="time-fields">
@@ -154,6 +159,7 @@ select{padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;b
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
+// Days: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 0=Sun (JS getDay())
 const EMPLOYEES = [
   {id:'trinidad',name:'Trinidad Hernandez',role:'Vendedora',schedule:{1:[{s:'10:00',e:'15:30'}],4:[{s:'12:45',e:'16:00'}],5:[{s:'12:45',e:'17:30'}]}},
   {id:'franco',name:'Franco Pichinenda',role:'Vendedor',schedule:{2:[{s:'09:15',e:'15:30'}],4:[{s:'09:15',e:'14:30'}],5:[{s:'09:15',e:'15:30'}]}},
@@ -173,26 +179,20 @@ let modalCtx = null;
 function storageKey(){return 'att_'+curYear+'_'+curMonth;}
 function vacKey(id){return 'vac_'+id+'_'+curYear;}
 
+// JS getDay() returns 1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat,0=Sun
+// We use that directly — no conversion needed
+function getDow(y,m,d){return new Date(y,m,d).getDay();}
+
 function loadData(){
-  try{
-    const r = localStorage.getItem(storageKey());
-    records = r ? JSON.parse(r) : {};
-  }catch(e){records={};}
+  try{const r=localStorage.getItem(storageKey());records=r?JSON.parse(r):{};}catch(e){records={};}
   for(const emp of EMPLOYEES){
-    try{
-      const v = localStorage.getItem(vacKey(emp.id));
-      vacUsed[emp.id] = v ? parseInt(v) : 0;
-    }catch(e){vacUsed[emp.id]=0;}
+    try{const v=localStorage.getItem(vacKey(emp.id));vacUsed[emp.id]=v?parseInt(v):0;}
+    catch(e){vacUsed[emp.id]=0;}
   }
 }
 
-function saveData(){
-  localStorage.setItem(storageKey(), JSON.stringify(records));
-}
-
-function saveVac(id){
-  localStorage.setItem(vacKey(id), String(vacUsed[id]||0));
-}
+function saveData(){localStorage.setItem(storageKey(),JSON.stringify(records));}
+function saveVac(id){localStorage.setItem(vacKey(id),String(vacUsed[id]||0));}
 
 function doLogin(){
   const u=document.getElementById('usr').value.trim();
@@ -201,9 +201,7 @@ function doLogin(){
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app-screen').classList.remove('hidden');
     init();
-  } else {
-    document.getElementById('login-err').classList.remove('hidden');
-  }
+  }else{document.getElementById('login-err').classList.remove('hidden');}
 }
 
 function doLogout(){
@@ -217,14 +215,8 @@ function doLogout(){
 function init(){
   const sel=document.getElementById('filter-emp');
   sel.innerHTML='<option value="all">Todos los empleados</option>';
-  for(const e of EMPLOYEES){
-    const o=document.createElement('option');
-    o.value=e.id;o.textContent=e.name;
-    sel.appendChild(o);
-  }
-  loadData();
-  updateMonthLabel();
-  render();
+  for(const e of EMPLOYEES){const o=document.createElement('option');o.value=e.id;o.textContent=e.name;sel.appendChild(o);}
+  loadData();updateMonthLabel();render();
 }
 
 function updateMonthLabel(){
@@ -237,44 +229,55 @@ function changeMonth(d){
   curMonth+=d;
   if(curMonth<0){curMonth=11;curYear--;}
   if(curMonth>11){curMonth=0;curYear++;}
-  loadData();
-  updateMonthLabel();
-  render();
+  loadData();updateMonthLabel();render();
 }
 
 function getDaysInMonth(y,m){return new Date(y,m+1,0).getDate();}
-function getFirstDow(y,m){let d=new Date(y,m,1).getDay();return d===0?6:d-1;}
+
+// For calendar grid: Monday=0 offset
+function getFirstDowOffset(y,m){
+  const d=new Date(y,m,1).getDay();
+  return d===0?6:d-1; // Sun->6, Mon->0, Tue->1...
+}
+
 function toMin(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
 function minToStr(m){
   const neg=m<0;const abs=Math.abs(m);
   const h=Math.floor(abs/60);const mn=abs%60;
-  return (neg?'-':'')+(String(h).padStart(2,'0'))+':'+(String(mn).padStart(2,'0'))+'hs';
+  return(neg?'-':'')+(String(h).padStart(2,'0'))+':'+(String(mn).padStart(2,'0'))+'hs';
 }
 
 function getRecord(empId,day){return records[empId+'_'+day]||null;}
 
 function empStats(emp){
   const days=getDaysInMonth(curYear,curMonth);
-  let present=0,late=0,absent=0,vac=0,totalExpMin=0,totalRealMin=0,lateMins=0;
+  let present=0,late=0,absent=0,vac=0,recovery=0,totalExpMin=0,totalRealMin=0,lateMins=0;
   for(let d=1;d<=days;d++){
-    const dow=new Date(curYear,curMonth,d).getDay();
-    const jsDow=dow===0?6:dow-1;
-    if(!emp.schedule[jsDow]) continue;
-    const sch=emp.schedule[jsDow][0];
+    const dow=getDow(curYear,curMonth,d);
+    const hasWork=!!emp.schedule[dow];
     const rec=getRecord(emp.id,d);
-    totalExpMin+=toMin(sch.e)-toMin(sch.s);
+    if(hasWork){
+      const sch=emp.schedule[dow][0];
+      totalExpMin+=toMin(sch.e)-toMin(sch.s);
+    }
     if(!rec) continue;
     if(rec.status==='present'||rec.status==='late'){
       present++;
       if(rec.inTime&&rec.outTime){
         totalRealMin+=toMin(rec.outTime)-toMin(rec.inTime);
-        const diff=toMin(rec.inTime)-toMin(sch.s);
-        if(diff>0){late++;lateMins+=diff;}
+        if(hasWork){
+          const sch=emp.schedule[dow][0];
+          const diff=toMin(rec.inTime)-toMin(sch.s);
+          if(diff>0){late++;lateMins+=diff;}
+        }
       }
-    } else if(rec.status==='absent'){absent++;}
+    }else if(rec.status==='absent'){absent++;}
     else if(rec.status==='vacation'){vac++;}
+    else if(rec.status==='recovery'){recovery++;
+      if(rec.inTime&&rec.outTime) totalRealMin+=toMin(rec.outTime)-toMin(rec.inTime);
+    }
   }
-  return{present,late,absent,vac,totalExpMin,totalRealMin,lateMins};
+  return{present,late,absent,vac,recovery,totalExpMin,totalRealMin,lateMins};
 }
 
 function render(){
@@ -286,20 +289,16 @@ function render(){
   if(filter==='all'){
     const vendedores=EMPLOYEES.filter(e=>e.role!=='Administración');
     const admins=EMPLOYEES.filter(e=>e.role==='Administración');
-
     [['Vendedores',vendedores],['Administración',admins]].forEach(([title,group])=>{
       const label=document.createElement('p');
       label.style.cssText='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#aaa;margin-bottom:10px';
-      label.textContent=title;
-      area.appendChild(label);
-      const grid=document.createElement('div');
-      grid.className='emp-grid';
+      label.textContent=title;area.appendChild(label);
+      const grid=document.createElement('div');grid.className='emp-grid';
       for(const emp of group){
         const st=empStats(emp);
         const vacLeft=VAC_TOTAL-(vacUsed[emp.id]||0);
         const pct=((vacUsed[emp.id]||0)/VAC_TOTAL)*100;
-        const card=document.createElement('div');
-        card.className='emp-card';
+        const card=document.createElement('div');card.className='emp-card';
         card.onclick=()=>{document.getElementById('filter-emp').value=emp.id;render();};
         card.innerHTML=`<div class="emp-name">${emp.name}</div>
           <div class="emp-role">${emp.role}</div>
@@ -308,6 +307,7 @@ function render(){
             ${st.late>0?`<span class="stat-pill pill-late">⏱ ${st.late} tard.</span>`:''}
             ${st.absent>0?`<span class="stat-pill pill-abs">✗ ${st.absent} ausencias</span>`:''}
             ${st.vac>0?`<span class="stat-pill pill-vac">🏖 ${st.vac} vac.</span>`:''}
+            ${st.recovery>0?`<span class="stat-pill pill-rec">🔄 ${st.recovery} recupero</span>`:''}
           </div>
           <div class="vac-bar">Vacaciones: ${vacLeft} días restantes de ${VAC_TOTAL}
             <div class="vac-track"><div class="vac-fill" style="width:${Math.min(pct,100)}%"></div></div>
@@ -323,52 +323,58 @@ function render(){
     const st=empStats(emp);
     const vacLeft=VAC_TOTAL-(vacUsed[emp.id]||0);
     const pct=((vacUsed[emp.id]||0)/VAC_TOTAL)*100;
-    const sec=document.createElement('div');
-    sec.className='cal-section';
+    const sec=document.createElement('div');sec.className='cal-section';
 
     sec.innerHTML=`<div class="section-header">
       <div><div style="font-size:16px;font-weight:700">${emp.name}</div><div style="font-size:12px;color:#888">${emp.role}</div></div>
-      <div class="vac-badge">🏖 ${vacLeft}/${VAC_TOTAL} días de vacaciones disponibles</div>
+      <div class="vac-badge">🏖 ${vacLeft}/${VAC_TOTAL} días disponibles</div>
     </div>
     <div class="summary-row">
       <div class="sum-card"><div class="sum-label">Presentes</div><div class="sum-val" style="color:#3b6d11">${st.present}</div></div>
       <div class="sum-card"><div class="sum-label">Tardanzas</div><div class="sum-val" style="color:#854f0b">${st.late}<span style="font-size:11px;font-weight:400;margin-left:3px">${st.lateMins>0?minToStr(st.lateMins):''}</span></div></div>
       <div class="sum-card"><div class="sum-label">Ausencias</div><div class="sum-val" style="color:#a32d2d">${st.absent}</div></div>
       <div class="sum-card"><div class="sum-label">Vacaciones</div><div class="sum-val" style="color:#185fa5">${st.vac}</div></div>
+      <div class="sum-card"><div class="sum-label">Recuperos</div><div class="sum-val" style="color:#6b21a8">${st.recovery}</div></div>
       <div class="sum-card"><div class="sum-label">Hs esperadas</div><div class="sum-val">${minToStr(st.totalExpMin)}</div></div>
       <div class="sum-card"><div class="sum-label">Hs reales</div><div class="sum-val">${minToStr(st.totalRealMin)}</div></div>
     </div>`;
 
-    const calGrid=document.createElement('div');
-    calGrid.className='cal-grid';
+    const calGrid=document.createElement('div');calGrid.className='cal-grid';
     ['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'].forEach(d=>{
       const h=document.createElement('div');h.className='cal-dow';h.textContent=d;calGrid.appendChild(h);
     });
 
-    const firstDow=getFirstDow(curYear,curMonth);
+    const firstOffset=getFirstDowOffset(curYear,curMonth);
     const totalDays=getDaysInMonth(curYear,curMonth);
-    for(let i=0;i<firstDow;i++){const e=document.createElement('div');e.className='cal-day empty';calGrid.appendChild(e);}
+    for(let i=0;i<firstOffset;i++){const e=document.createElement('div');e.className='cal-day empty';calGrid.appendChild(e);}
 
     for(let d=1;d<=totalDays;d++){
-      const dow=new Date(curYear,curMonth,d).getDay();
-      const jsDow=dow===0?6:dow-1;
-      const hasWork=!!emp.schedule[jsDow];
+      const dow=getDow(curYear,curMonth,d);
+      const hasWork=!!emp.schedule[dow];
       const rec=getRecord(emp.id,d);
       const cell=document.createElement('div');
       cell.className='cal-day'+(hasWork?'':' nowork');
-      if(rec){cell.classList.add(rec.status==='present'?'present':rec.status==='late'?'late':rec.status==='absent'?'absent':'vacation');}
-
-      const statusMap={present:'<span class="day-badge" style="color:#3b6d11">Presente</span>',
+      if(rec){
+        cell.classList.remove('nowork');
+        if(rec.status==='present') cell.classList.add('present');
+        else if(rec.status==='late') cell.classList.add('late');
+        else if(rec.status==='absent') cell.classList.add('absent');
+        else if(rec.status==='vacation') cell.classList.add('vacation');
+        else if(rec.status==='recovery') cell.classList.add('recovery');
+      }
+      const statusMap={
+        present:'<span class="day-badge" style="color:#3b6d11">Presente</span>',
         late:'<span class="day-badge" style="color:#854f0b">Tarde</span>',
         absent:'<span class="day-badge" style="color:#a32d2d">Ausente</span>',
-        vacation:'<span class="day-badge" style="color:#185fa5">Vacaciones</span>'};
+        vacation:'<span class="day-badge" style="color:#185fa5">Vacaciones</span>',
+        recovery:'<span class="day-badge" style="color:#6b21a8">Recupero</span>'
+      };
       const timeLabel=rec&&rec.inTime&&rec.outTime?`<div class="day-time">${rec.inTime}<br>${rec.outTime}</div>`:'';
-      cell.innerHTML=`<div class="day-num">${d}</div>${rec?statusMap[rec.status]:''}${timeLabel}`;
-
-      if(hasWork){
-        cell.title='Click para registrar';
-        cell.onclick=(()=>{const dd=d;const ee=emp;return()=>openModal(ee,dd);})(d,emp);
-      }
+      const hint=!hasWork&&!rec?'<div class="nowork-hint">+</div>':'';
+      cell.innerHTML=`<div class="day-num">${d}</div>${rec?statusMap[rec.status]:''}${timeLabel}${hint}`;
+      // All days are clickable — nowork days show recovery option
+      cell.title=hasWork?'Click para registrar':'Click para registrar recupero';
+      cell.onclick=(()=>{const dd=d;const ee=emp;const hw=hasWork;return()=>openModal(ee,dd,hw);})(d,emp,hasWork);
       calGrid.appendChild(cell);
     }
     sec.appendChild(calGrid);
@@ -376,56 +382,61 @@ function render(){
   }
 }
 
-function openModal(emp,day){
-  modalCtx={emp,day};
-  const dow=new Date(curYear,curMonth,day).getDay();
-  const jsDow=dow===0?6:dow-1;
-  const sch=emp.schedule[jsDow][0];
+function openModal(emp,day,hasWork){
+  modalCtx={emp,day,hasWork};
+  const dow=getDow(curYear,curMonth,day);
+  const sch=hasWork?emp.schedule[dow][0]:null;
   document.getElementById('modal-title').textContent='Registrar asistencia';
-  document.getElementById('modal-sub').textContent=`${emp.name} — ${String(day).padStart(2,'0')}/${String(curMonth+1).padStart(2,'0')}/${curYear}  ·  Horario esperado: ${sch.s} – ${sch.e}`;
+  const dateStr=String(day).padStart(2,'0')+'/'+String(curMonth+1).padStart(2,'0')+'/'+curYear;
+  document.getElementById('modal-sub').textContent=
+    emp.name+' — '+dateStr+(sch?' · Horario esperado: '+sch.s+' – '+sch.e:' · Día sin turno asignado');
   const rec=getRecord(emp.id,day);
-  document.getElementById('m-status').value=rec?rec.status:'present';
-  document.getElementById('m-in').value=rec&&rec.inTime?rec.inTime:sch.s;
-  document.getElementById('m-out').value=rec&&rec.outTime?rec.outTime:sch.e;
+
+  // Build status options depending on whether it's a work day
+  const sel=document.getElementById('m-status');
+  if(hasWork){
+    sel.innerHTML=`<option value="present">✅ Presente</option>
+      <option value="late">🕐 Llegó tarde</option>
+      <option value="absent">❌ Ausente</option>
+      <option value="vacation">🏖 Vacaciones</option>
+      <option value="recovery">🔄 Recupero</option>`;
+  }else{
+    sel.innerHTML=`<option value="recovery">🔄 Recupero (día extra)</option>`;
+  }
+
+  sel.value=rec?(hasWork?rec.status:'recovery'):(hasWork?'present':'recovery');
+  document.getElementById('m-in').value=rec&&rec.inTime?rec.inTime:(sch?sch.s:'09:00');
+  document.getElementById('m-out').value=rec&&rec.outTime?rec.outTime:(sch?sch.e:'17:00');
   toggleTimeFields();
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
 function toggleTimeFields(){
   const s=document.getElementById('m-status').value;
-  document.getElementById('time-fields').style.display=(s==='present'||s==='late')?'block':'none';
+  document.getElementById('time-fields').style.display=(s==='present'||s==='late'||s==='recovery')?'block':'none';
 }
 
 function closeModalDirect(){document.getElementById('modal-overlay').classList.add('hidden');modalCtx=null;}
 document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)closeModalDirect();});
 
 function saveRecord(){
-  const{emp,day}=modalCtx;
+  const{emp,day,hasWork}=modalCtx;
   const status=document.getElementById('m-status').value;
   const inTime=document.getElementById('m-in').value;
   const outTime=document.getElementById('m-out').value;
   const k=emp.id+'_'+day;
   const prevRec=records[k];
   const wasVac=prevRec&&prevRec.status==='vacation';
-  const wasAbs=prevRec&&prevRec.status==='absent';
 
   if(status==='vacation'){
     if(!wasVac) vacUsed[emp.id]=(vacUsed[emp.id]||0)+1;
-  } else if(status==='absent'){
-    if(wasVac) vacUsed[emp.id]=Math.max(0,(vacUsed[emp.id]||0)-1);
-  } else {
+  }else{
     if(wasVac) vacUsed[emp.id]=Math.max(0,(vacUsed[emp.id]||0)-1);
   }
 
-  records[k]={
-    status,
-    inTime:(status==='present'||status==='late')?inTime:'',
-    outTime:(status==='present'||status==='late')?outTime:''
-  };
-  saveData();
-  saveVac(emp.id);
-  closeModalDirect();
-  render();
+  const showTime=status==='present'||status==='late'||status==='recovery';
+  records[k]={status,inTime:showTime?inTime:'',outTime:showTime?outTime:''};
+  saveData();saveVac(emp.id);closeModalDirect();render();
 }
 
 function exportPDF(){
@@ -434,6 +445,7 @@ function exportPDF(){
   const{jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
   const monthName=new Date(curYear,curMonth,1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+  const dowNames=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 
   emps.forEach((emp,idx)=>{
     if(idx>0) doc.addPage();
@@ -441,17 +453,11 @@ function exportPDF(){
     const vacLeft=VAC_TOTAL-(vacUsed[emp.id]||0);
     let y=18;
 
-    doc.setFontSize(9);doc.setTextColor(150);
-    doc.text('CONTROL DE ASISTENCIAS',14,y);
-    y+=6;
-    doc.setFontSize(18);doc.setTextColor(0);doc.setFont(undefined,'bold');
-    doc.text(emp.name,14,y);
-    y+=7;
+    doc.setFontSize(9);doc.setTextColor(150);doc.text('CONTROL DE ASISTENCIAS',14,y);y+=6;
+    doc.setFontSize(18);doc.setTextColor(0);doc.setFont(undefined,'bold');doc.text(emp.name,14,y);y+=7;
     doc.setFontSize(11);doc.setFont(undefined,'normal');doc.setTextColor(100);
-    doc.text(emp.role+' · '+monthName.charAt(0).toUpperCase()+monthName.slice(1),14,y);
-    y+=10;
+    doc.text(emp.role+' · '+monthName.charAt(0).toUpperCase()+monthName.slice(1),14,y);y+=10;
 
-    // Stats boxes
     const boxes=[
       {label:'Presentes',val:String(st.present),bg:[234,243,222],tc:[58,109,17]},
       {label:'Tardanzas',val:st.late+(st.lateMins>0?' ('+minToStr(st.lateMins)+')':''),bg:[250,238,218],tc:[133,79,11]},
@@ -462,10 +468,8 @@ function exportPDF(){
     boxes.forEach((b,i)=>{
       const x=14+i*(bw+3);
       doc.setFillColor(...b.bg);doc.roundedRect(x,y,bw,14,2,2,'F');
-      doc.setFontSize(8);doc.setTextColor(100);doc.setFont(undefined,'normal');
-      doc.text(b.label,x+3,y+5);
-      doc.setFontSize(10);doc.setTextColor(...b.tc);doc.setFont(undefined,'bold');
-      doc.text(b.val,x+3,y+11);
+      doc.setFontSize(8);doc.setTextColor(100);doc.setFont(undefined,'normal');doc.text(b.label,x+3,y+5);
+      doc.setFontSize(10);doc.setTextColor(...b.tc);doc.setFont(undefined,'bold');doc.text(b.val,x+3,y+11);
     });
     y+=20;
 
@@ -475,71 +479,67 @@ function exportPDF(){
     const diff=st.totalRealMin-st.totalExpMin;
     doc.setTextColor(diff>=0?58:163,diff>=0?109:45,diff>=0?17:45);
     doc.text('Diferencia: '+(diff>=0?'+':'')+minToStr(diff),140,y);
-    doc.setTextColor(0);
-    y+=12;
+    doc.setTextColor(0);y+=12;
 
     // Table header
     doc.setFillColor(245,245,242);doc.rect(14,y,182,8,'F');
     doc.setFontSize(9);doc.setFont(undefined,'bold');doc.setTextColor(80);
-    const cols=[14,42,80,110,140,168];
-    const heads=['Fecha','Horario esperado','Entrada','Salida','Estado','Diferencia'];
-    heads.forEach((h,i)=>doc.text(h,cols[i]+2,y+5.5));
+    const cols=[14,42,82,112,142,170];
+    ['Fecha','Horario esperado','Entrada','Salida','Estado','Diferencia'].forEach((h,i)=>doc.text(h,cols[i]+2,y+5.5));
     y+=10;
 
-    doc.setFont(undefined,'normal');doc.setTextColor(0);
     const totalDays=getDaysInMonth(curYear,curMonth);
-    const dows=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    doc.setFont(undefined,'normal');doc.setTextColor(0);
 
     for(let d=1;d<=totalDays;d++){
-      const jsDate=new Date(curYear,curMonth,d);
-      const dow=jsDate.getDay();
-      const jsDow=dow===0?6:dow-1;
-      if(!emp.schedule[jsDow]) continue;
-      const sch=emp.schedule[jsDow][0];
+      const dow=getDow(curYear,curMonth,d);
+      const hasWork=!!emp.schedule[dow];
       const rec=getRecord(emp.id,d);
-      const dateStr=dows[dow]+' '+String(d).padStart(2,'0')+'/'+(String(curMonth+1).padStart(2,'0'));
-      const statusMap={present:'Presente',late:'Tarde',absent:'Ausente',vacation:'Vacaciones'};
-      const colorMap={present:[58,109,17],late:[133,79,11],absent:[163,45,45],vacation:[24,95,165]};
+      if(!hasWork&&!rec) continue; // skip non-work days with no record
+      const sch=hasWork?emp.schedule[dow][0]:null;
+      const dateStr=dowNames[dow]+' '+String(d).padStart(2,'0')+'/'+(String(curMonth+1).padStart(2,'0'));
+      const statusMap={present:'Presente',late:'Tarde',absent:'Ausente',vacation:'Vacaciones',recovery:'Recupero'};
+      const colorMap={present:[58,109,17],late:[133,79,11],absent:[163,45,45],vacation:[24,95,165],recovery:[107,33,168]};
       let diffStr='-',inStr='-',outStr='-';
-      if(rec&&(rec.status==='present'||rec.status==='late')&&rec.inTime&&rec.outTime){
+      const schStr=sch?sch.s+' – '+sch.e:'Recupero';
+      if(rec&&(rec.status==='present'||rec.status==='late')&&rec.inTime&&rec.outTime&&sch){
         inStr=rec.inTime;outStr=rec.outTime;
         const dif=(toMin(rec.outTime)-toMin(rec.inTime))-(toMin(sch.e)-toMin(sch.s));
         diffStr=(dif>=0?'+':'')+minToStr(dif);
+      }else if(rec&&rec.status==='recovery'&&rec.inTime&&rec.outTime){
+        inStr=rec.inTime;outStr=rec.outTime;diffStr='Recupero';
       }
       if(y>272){doc.addPage();y=18;}
       doc.setFontSize(9);doc.setTextColor(0);
       doc.text(dateStr,cols[0]+2,y);
-      doc.text(sch.s+' – '+sch.e,cols[1]+2,y);
+      doc.text(schStr,cols[1]+2,y);
       doc.text(inStr,cols[2]+2,y);
       doc.text(outStr,cols[3]+2,y);
       if(rec){const c=colorMap[rec.status];doc.setTextColor(...c);doc.text(statusMap[rec.status],cols[4]+2,y);doc.setTextColor(0);}
       else doc.text('—',cols[4]+2,y);
       doc.text(diffStr,cols[5]+2,y);
-      y+=5;
-      doc.setDrawColor(230);doc.line(14,y,196,y);
-      y+=1;
+      y+=5;doc.setDrawColor(230);doc.line(14,y,196,y);y+=1;
     }
 
-    // Absence summary
-    const absDays=[];
+    // Absence/vacation/recovery summary
+    const specDays=[];
     for(let d=1;d<=totalDays;d++){
       const rec=getRecord(emp.id,d);
-      if(rec&&(rec.status==='absent'||rec.status==='vacation')){
-        const dow=new Date(curYear,curMonth,d).getDay();
-        absDays.push({d,status:rec.status,dow});
+      if(rec&&(rec.status==='absent'||rec.status==='vacation'||rec.status==='recovery')){
+        const dow=getDow(curYear,curMonth,d);
+        specDays.push({d,status:rec.status,dow});
       }
     }
-    if(absDays.length>0){
+    if(specDays.length>0){
       if(y>260){doc.addPage();y=18;}
-      y+=6;
-      doc.setFontSize(10);doc.setFont(undefined,'bold');doc.setTextColor(0);
-      doc.text('Detalle de ausencias y vacaciones',14,y);y+=7;
+      y+=6;doc.setFontSize(10);doc.setFont(undefined,'bold');doc.setTextColor(0);
+      doc.text('Detalle de ausencias, vacaciones y recuperos',14,y);y+=7;
       doc.setFont(undefined,'normal');doc.setFontSize(9);
-      for(const a of absDays){
-        const label=a.status==='absent'?'Ausencia':'Vacaciones';
-        const c=a.status==='absent'?[163,45,45]:[24,95,165];
-        doc.setTextColor(...c);
-        doc.text('· '+dows[a.dow===6?0:a.dow+1]+' '+String(a.d).padStart(2,'0')+'/'+(String(curMonth+1).padStart(2,'0'))+'/'+curYear+': '+label,16,y);
+      const labelMap={absent:'Ausencia',vacation:'Vacaciones',recovery:'Recupero'};
+      const colMap={absent:[163,45,45],vacation:[24,95,165],recovery:[107,33,168]};
+      for(const a of specDays){
+        doc.setTextColor(...colMap[a.status]);
+        doc.text('· '+dowNames[a.dow]+' '+String(a.d).padStart(2,'0')+'/'+(String(curMonth+1).padStart(2,'0'))+'/'+curYear+': '+labelMap[a.status],16,y);
         doc.setTextColor(0);y+=5;
         if(y>278){doc.addPage();y=18;}
       }
